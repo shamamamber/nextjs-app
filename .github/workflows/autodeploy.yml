@@ -3,73 +3,65 @@ name: Automate Deployment for Next.js
 on:
   push:
     branches:
-      - dev  # Specify the branch that triggers the workflow (change if needed)
+      - dev  # Trigger the workflow on push to the 'dev' branch
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Checkout the repository
       - name: Checkout Repository
-        uses: actions/checkout@v3  # Updated version of checkout action
+        uses: actions/checkout@v3  # Use the latest version
 
+      # Step 2: Setup Node.js
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v2
         with:
-          node-version: '16'  # Specify the version of Node.js you need
+          node-version: '16'  # Specify the Node.js version your Next.js app requires
 
+      # Step 3: Install Dependencies
       - name: Install Dependencies
-        run: npm install  # Install the Node.js dependencies for your Next.js project
+        run: npm install  # Install dependencies for the Next.js app
 
+      # Step 4: Build Next.js App
       - name: Build Next.js App
-        run: npm run build  # Build the Next.js application
+        run: npm run build  # Build the Next.js app
 
-      - name: Deploy to cPanel
+      # Step 5: Deploy to cPanel via SSH
+      - name: Deploy to cPanel via SSH
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.CPANEL_HOST }}
-          username: ${{ secrets.CPANEL_USERNAME }}
-          password: ${{ secrets.CPANEL_PASSWORD }}
-          port: 17177  # Specify your cPanel SSH port
+          host: ${{ secrets.CPANEL_HOST }}  # Your cPanel host or IP
+          username: ${{ secrets.CPANEL_USERNAME }}  # Your cPanel username
+          password: ${{ secrets.CPANEL_PASSWORD }}  # Your cPanel password
+          port: 17177  # Your cPanel SSH port (usually 22, adjust as needed)
           script: |
             export TERM=xterm
-            cd /home/${{ secrets.CPANEL_USERNAME }}/public_html/nextjs-app  # Change this path to your deployment directory
+            cd /home/techozon/deploynextapp.techozon.com  # Update with your correct directory
             # Remove previous build files
-            rm -rf .next static  # Adjust these as per your project's folder structure
-            
-            # Pull the latest changes
+            rm -rf .next static
+
+            # Pull the latest changes from the dev branch
             git reset --hard
             git pull origin dev
 
-            # Copy the new build files from the GitHub Actions runner to your cPanel server
+            # Sync local files to the cPanel server
             rsync -avz --exclude=node_modules/ --exclude=.git/ ./ ./
 
-            # Install production dependencies (you can skip devDependencies)
+            # Install production dependencies
             npm install --production
 
-            # Optionally, you can restart any running services if applicable
-            pm2 restart nextjs-app  # Adjust based on your deployment method
-            
+            # Optionally, restart any services if necessary (e.g., pm2)
+            pm2 restart nextjs-app  # Adjust if needed
 
-      - name: Notify on success
+      # Step 6: Notify on Success
+      - name: Notify on Success
         if: success()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: success
-          fields: repo,commit
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
-          SLACK_USERNAME: 'Deployment Bot'
+        run: echo "Deployment successful!"
 
-      - name: Notify on failure
+      # Step 7: Notify on Failure
+      - name: Notify on Failure
         if: failure()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: failure
-          fields: repo,commit
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
-          SLACK_USERNAME: 'Deployment Bot'
+        run: echo "Deployment failed!"
 
